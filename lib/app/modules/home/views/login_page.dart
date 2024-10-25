@@ -2,9 +2,19 @@ import 'package:codelab3/app/modules/home/views/register_page.dart';
 import 'package:codelab3/app/modules/home/views/home_page.dart'; // Import HomePage
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
+
+  @override
+  _LoginPageState createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +47,7 @@ class LoginPage extends StatelessWidget {
 
               // Email Input Field
               TextField(
+                controller: _emailController,  // Tambahkan controller
                 decoration: InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
@@ -47,6 +58,7 @@ class LoginPage extends StatelessWidget {
 
               // Password Input Field
               TextField(
+                controller: _passwordController,  // Tambahkan controller
                 decoration: InputDecoration(
                   labelText: 'Password',
                   border: OutlineInputBorder(),
@@ -58,9 +70,43 @@ class LoginPage extends StatelessWidget {
 
               // Login Button
               ElevatedButton(
-                onPressed: () {
-                  // Navigate to HomePage after successful login
-                  Get.off(HomePage());
+                onPressed: () async {
+                  String email = _emailController.text.trim();
+                  String password = _passwordController.text.trim();
+
+                  if (email.isEmpty || password.isEmpty) {
+                    Get.snackbar("Error", "Please enter both email and password",
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.redAccent,
+                        colorText: Colors.white);
+                    return;
+                  }
+
+                  try {
+                    // Login menggunakan Firebase Authentication
+                    UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+                      email: email,
+                      password: password,
+                    );
+
+                    // Mengarahkan ke HomePage setelah login berhasil
+                    Get.off(() => HomePage());
+                  } on FirebaseAuthException catch (e) {
+                    String message;
+                    if (e.code == 'user-not-found') {
+                      message = "No user found for this email.";
+                    } else if (e.code == 'wrong-password') {
+                      message = "Incorrect password. Please try again.";
+                    } else {
+                      message = "An error occurred. Please try again.";
+                    }
+
+                    // Menampilkan pesan error menggunakan snackbar
+                    Get.snackbar("Login Error", message,
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.redAccent,
+                        colorText: Colors.white);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
