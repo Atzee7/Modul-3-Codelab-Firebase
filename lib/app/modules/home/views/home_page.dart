@@ -10,7 +10,7 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePa geState extends State<HomePage> {
+class _HomePageState extends State<HomePage> {
   final TextEditingController _taskController = TextEditingController();
   final CollectionReference _tasksCollection = FirebaseFirestore.instance.collection('tasks');
 
@@ -202,3 +202,5 @@ class _HomePa geState extends State<HomePage> {
     );
   }
 }
+
+//Final
