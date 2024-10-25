@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_page.dart'; // Import LoginPage
 
 class HomePage extends StatefulWidget {
@@ -9,25 +10,41 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  final List<String> _tasks = []; // List untuk menyimpan tugas
+class _HomePa geState extends State<HomePage> {
   final TextEditingController _taskController = TextEditingController();
+  final CollectionReference _tasksCollection = FirebaseFirestore.instance.collection('tasks');
 
-  // Fungsi untuk menambah tugas
-  void _addTask() {
-    if (_taskController.text.isNotEmpty) {
-      setState(() {
-        _tasks.add(_taskController.text);
+  // Fungsi untuk menambah tugas ke Firestore
+  Future<void> _addTask(String task) async {
+    if (task.isNotEmpty) {
+      try {
+        await _tasksCollection.add({'task': task});
         _taskController.clear();
-      });
+        Get.snackbar("Success", "Task added successfully!", snackPosition: SnackPosition.BOTTOM);
+      } catch (e) {
+        Get.snackbar("Error", "Failed to add task", snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+      }
     }
   }
 
-  // Fungsi untuk menghapus tugas
-  void _deleteTask(int index) {
-    setState(() {
-      _tasks.removeAt(index);
-    });
+  // Fungsi untuk memperbarui tugas di Firestore
+  Future<void> _updateTask(String docId, String newTask) async {
+    try {
+      await _tasksCollection.doc(docId).update({'task': newTask});
+      Get.snackbar("Success", "Task updated successfully!", snackPosition: SnackPosition.BOTTOM);
+    } catch (e) {
+      Get.snackbar("Error", "Failed to update task", snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+    }
+  }
+
+  // Fungsi untuk menghapus tugas dari Firestore
+  Future<void> _deleteTask(String docId) async {
+    try {
+      await _tasksCollection.doc(docId).delete();
+      Get.snackbar("Success", "Task deleted successfully!", snackPosition: SnackPosition.BOTTOM);
+    } catch (e) {
+      Get.snackbar("Error", "Failed to delete task", snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+    }
   }
 
   // Fungsi untuk logout
@@ -91,7 +108,9 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: _addTask,
+                  onPressed: () {
+                    _addTask(_taskController.text.trim());
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -102,35 +121,81 @@ class _HomePageState extends State<HomePage> {
             ),
             SizedBox(height: 16),
 
-            // Daftar Tugas
+            // Daftar Tugas dari Firestore
             Expanded(
-              child: _tasks.isEmpty
-                  ? Center(
-                child: Text(
-                  "No tasks added yet!",
-                  style: TextStyle(fontSize: 18, color: Colors.blueAccent),
-                ),
-              )
-                  : ListView.builder(
-                itemCount: _tasks.length,
-                itemBuilder: (context, index) {
-                  return Card(
-                    color: Colors.white,
-                    margin: EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      title: Text(
-                        _tasks[index],
-                        style: TextStyle(fontSize: 18),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _tasksCollection.snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "No tasks added yet!",
+                        style: TextStyle(fontSize: 18, color: Colors.blueAccent),
                       ),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteTask(index),
-                      ),
-                    ),
+                    );
+                  }
+
+                  final tasks = snapshot.data!.docs;
+                  return ListView.builder(
+                    itemCount: tasks.length,
+                    itemBuilder: (context, index) {
+                      final task = tasks[index];
+                      return Card(
+                        color: Colors.white,
+                        margin: EdgeInsets.symmetric(vertical: 8),
+                        child: ListTile(
+                          title: Text(
+                            task['task'],
+                            style: TextStyle(fontSize: 18),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit, color: Colors.blueAccent),
+                                onPressed: () {
+                                  _taskController.text = task['task'];
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) {
+                                      return AlertDialog(
+                                        title: Text("Update Task"),
+                                        content: TextField(
+                                          controller: _taskController,
+                                          decoration: InputDecoration(hintText: "Enter new task"),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              _updateTask(task.id, _taskController.text.trim());
+                                              Navigator.of(context).pop();
+                                            },
+                                            child: Text("Update"),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _deleteTask(task.id),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
-            ),
+            )
+
           ],
         ),
       ),
